@@ -5,25 +5,46 @@ import os
 import subprocess
 from datetime import datetime
 import pymysql.cursors
-from pymysql import IntegrityError, MySQLError, InternalError
+from pymysql import IntegrityError, InternalError
+
+
+class Markers:
+    data = {}
+
+    def __init__(self):
+        with open('output/marker-types/markers-renamed.csv', 'r') as infile:
+            for line in infile:
+                data_buffer = line.split(',')
+
+                for index in range(len(data_buffer)):
+                    data_buffer[index] = data_buffer[index].strip().strip('\"')
+
+                self.data[data_buffer[2]] = data_buffer
 
 
 class ConvertJsonToSQL:
     connection = None
     object_data = {}
+    verbose_output = False
 
-    def __init__(self, path: str, refresh_db=False, skip_to=0):
+    def __init__(self, path: str, refresh_db=False, marker_data=None):
         # self.start_time = datetime.now()
         # self.on_start()
-        self.loadObjectData()
+        # self.loadObjectData()
+
+        self.marker_data = marker_data
 
         if refresh_db:
             self.refresh_database()
 
         self.database_connect()
-        self.query("ALTER TABLE `markers` ADD UNIQUE `unique_index`(`marker_name`, `marker_type_id`, `x`, `z`);")
 
-        self.convert_file(path, skip_to)
+        if self.connection.open:
+            self.query("ALTER TABLE `markers` ADD UNIQUE `unique_index`(`marker_name`, `marker_type_id`, `x`, `z`);")
+            self.convert_file(path)
+
+        else:
+            print('\033[31mNot connected to database\033[0m')
 
     def on_start(self):
         print("Scan started at {0}".format(self.start_time.strftime("%Y-%m-%d %H:%M:%S.%f")))
@@ -63,23 +84,35 @@ class ConvertJsonToSQL:
             map_region = (map_region_z * 10 + map_region_x) + 1
 
             # Objects placed outside of the playable area
-            if map_region < 0:
-                map_region = 0
-            if map_region > 80:
-                map_region = 0
+            if map_region < 1:
+                map_region = 1
+            if map_region > 121:
+                map_region = 1
 
             marker_type = self.query(
-                "SELECT * FROM `marker_types` WHERE `marker_types`.`marker_type_name` = '{0}'".format(
+                "SELECT * FROM `botwmap`.`marker_types` WHERE `marker_types`.`marker_type_name` = '{0}'".format(
                     data[index]['type']))
 
             if len(marker_type) == 0:
-                self.query(
-                    "INSERT INTO `marker_types` (`id`, `marker_type_name`, `marker_type_slug`, `icon`, `marker_type_description`, `created_at`, `updated_at`) VALUES (NULL, '{0}', '{1}', 'images/icons/markers/default.png', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);".format(
+                name = data[index]['type']
+                icon = 'images/icons/markers/default.png'
+                description = ''
+
+                if data[index]['type'] in self.marker_data:
+                    name = self.marker_data[data[index]['type']][1]
+                    icon = self.marker_data[data[index]['type']][3]
+                    description = self.marker_data[data[index]['type']][4]
+
+                result = self.insert(
+                    "INSERT INTO `botwmap`.`marker_types` (`id`, `marker_type_name`, `marker_type_slug`, `icon`, `marker_type_description`, `created_at`, `updated_at`) VALUES (NULL, '{0}', '{1}', '{2}', '{3}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);".format(
+                        name,
                         data[index]['type'],
-                        data[index]['type']
+                        icon,
+                        description
                     ))
+
                 marker_type = self.query(
-                    "SELECT * FROM `marker_types` WHERE `marker_types`.`marker_type_name` = '{0}'".format(
+                    "SELECT * FROM `botwmap`.`marker_types` WHERE `marker_types`.`marker_type_slug` = '{0}'".format(
                         data[index]['type']))
 
             marker_type_id = marker_type[0]['id']
@@ -94,10 +127,7 @@ class ConvertJsonToSQL:
             # if hash in self.object_data:
             #     name = self.object_data[hash]['text']
 
-
-            print("INSERT INTO `markers` (`id`, `map_region_id`, `marker_type_id`, `marker_name`, `marker_description`, `x`, `y`, `z`, `source`, `created_at`, `updated_at`) VALUES (NULL, '{0}', '{1}', '{2}', '{3}', '{4}', '{5}', '{6}', '{7}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);".format(map_region, marker_type_id, name, description, x, y, z, source_file))
-
-            self.query(
+            self.insert(
                 "INSERT INTO `markers` (`id`, `map_region_id`, `marker_type_id`, `marker_name`, `marker_description`, `x`, `y`, `z`, `source`, `created_at`, `updated_at`) VALUES (NULL, '{0}', '{1}', '{2}', '{3}', '{4}', '{5}', '{6}', '{7}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);".format(
                     map_region, marker_type_id, name, data[index]['description'], float(data[index]['location']['x']),
                     float(data[index]['location']['y']), float(data[index]['location']['z']), source_file
@@ -161,26 +191,41 @@ class ConvertJsonToSQL:
             with self.connection.cursor() as cursor:
                 cursor.execute(query)
                 result = cursor.fetchall()
-        except IntegrityError as e:
-            print('Got error {!r}, errno is {}'.format(e, e.args[0]))
+                cursor.execute('COMMIT;')
+        except IntegrityError as error:
+            if self.verbose_output:
+                print('\033[31mERROR {0}: {1}\033[0m'.format(error.args[0], error.args[1]))
             # except pymysql.InternalError as e:
             #     print('\033[31merror!\033[0m')
-        except InternalError as e:
-            print('\033[31merror!\033[0m')
+        except InternalError as error:
+            if self.verbose_output:
+                print('\033[31mERROR {0}: {1}\033[0m'.format(error.args[0], error.args[1]))
 
         # finally:
         #     self.connection.close()
 
         return result
 
-    def insert(self, query: str, data: tuple) -> bool:
+    def insert(self, query: str):
+        result = False
+
         try:
             with self.connection.cursor() as cursor:
-                result = cursor.execute(query, data)
-        finally:
-            self.connection.close()
+                cursor.execute(query)
+                result = cursor.execute('COMMIT;')
+        except IntegrityError as error:
+            if self.verbose_output:
+                print('\033[31mERROR {0}: {1}\033[0m'.format(error.args[0], error.args[1]))
+            # except pymysql.InternalError as e:
+            #     print('\033[31merror!\033[0m')
+        except InternalError as error:
+            if self.verbose_output:
+                print('\033[31mERROR {0}: {1}\033[0m'.format(error.args[0], error.args[1]))
 
-        return True if result > 0 else False
+        # finally:
+        #     self.connection.close()
+
+        return result
 
     def refresh_database(self) -> None:
         print('Refreshing database...')
@@ -189,6 +234,7 @@ class ConvertJsonToSQL:
             "php",
             "C:\\wamp\\www\\botwmap\\artisan",
             "migrate:refresh"
+            # "--seed"
         ])
 
     def database_connect(self):
@@ -196,7 +242,7 @@ class ConvertJsonToSQL:
                                           user='root',
                                           password='',
                                           db='botwmap',
-                                          charset='utf8mb4',
+                                          # charset='utf8mb4',
                                           cursorclass=pymysql.cursors.DictCursor)
 
     def loadObjectData(self):
@@ -296,11 +342,12 @@ def read_json(data):
 def main():
     path = "C:\\Users\\zephe\\PycharmProjects\\botw-map-data\\output\\json"
     refresh_db = True
+    markers = Markers()
 
     for (dirpath, dirnames, filenames) in os.walk(path):
         directory = dirpath.replace('\\', '/') + '/'
         for filename in filenames:
-            ConvertJsonToSQL(directory + filename, refresh_db)
+            ConvertJsonToSQL(directory + filename, refresh_db, markers.data)
             refresh_db = False
 
 
