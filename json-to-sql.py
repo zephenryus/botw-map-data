@@ -341,7 +341,7 @@ def read_json(data):
 
 def main():
     path = "C:\\Users\\zephe\\PycharmProjects\\botw-map-data\\output\\json"
-    refresh_db = True
+    refresh_db = False
     markers = Markers()
 
     for (dirpath, dirnames, filenames) in os.walk(path):
