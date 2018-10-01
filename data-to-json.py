@@ -94,8 +94,10 @@ def main():
     crawl_file("C:\\botw-data\\decompressed\\aoc0005000c101c9400\\0010\\Map\\MainField", 46)
     # fc = FileCrawler("C:\\botw-data\\decompressed\\aoc0005000c101c9400\\0010\\Map\\MainField", 46)
     # C:\botw-data\decompressed\content\Map\MainField
+    crawl_file("C:\\botw-data\\decompressed\\content\\Map\\MainField", 34)
     # fc = FileCrawler("C:\\botw-data\\decompressed\\content\\Map\\MainField", 34)
     # C:\botw-data\decompressed\content\Pack\TitleBG\Map\MainField"
+    crawl_file("C:\\botw-data\\decompressed\\content\\Pack\\TitleBG\\Map\\MainField", 34)
     # fc = FileCrawler("C:\\botw-data\\decompressed\\content\\Pack\\TitleBG\\Map\\MainField", 34)
 
 

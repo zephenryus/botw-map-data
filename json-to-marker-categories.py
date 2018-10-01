@@ -52,7 +52,6 @@ def main():
                     "INSERT INTO `botwmap`.`marker_category_marker_type` (`id`, `marker_type_id`, `marker_category_id`, `created_at`, `updated_at`) VALUES (NULL, {0}, {1}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);".format(
                         marker_type[0]['id'], last_category[0]['id']))
 
-
 def query(connection, query: str):
     result = []
 

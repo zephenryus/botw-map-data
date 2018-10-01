@@ -22,7 +22,11 @@ def main():
                         marker_type_description = marker_type_description.strip()
                         updated_at = updated_at.strip()
 
-                    outfile.write('"{0}", "{1}", "{2}", "{3}", "{4}", "{5}", "{6}"\n'.format(id, marker_type_name, marker_type_slug, icon, marker_type_description, created_at, updated_at))
+                    outfile.write('"{0}", "{1}", "{2}", "{3}", "{4}", "{5}", "{6}"\n'.format(id, marker_type_name,
+                                                                                             marker_type_slug, icon,
+                                                                                             marker_type_description,
+                                                                                             created_at, updated_at))
+
 
 if __name__ == "__main__":
-    main();
+    main()
