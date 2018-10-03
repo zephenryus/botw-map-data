@@ -3,7 +3,7 @@ import json
 import os
 from datetime import datetime
 
-from byml.byaml import BYML
+from byml.byml import BYML
 from prod.prod import PrOD
 
 
@@ -32,8 +32,8 @@ class FileCrawler:
                     data = PrOD(current_file)
 
                 if signature == b'BY\x00\x02':
-                    buffer = BYML(current_file)
-                    data = buffer.data_object
+                    byml = BYML()
+                    data = byml.read(current_file)
 
                 self.save_as_json(data, "output/json/{0}".format(current_file[self.path_mask:]))
 
@@ -75,8 +75,8 @@ def crawl_file(path, path_mask=0):
                 data = PrOD(current_file)
 
             if signature == b'BY\x00\x02':
-                buffer = BYML(current_file)
-                data = buffer.data_object
+                byml = BYML()
+                data = byml.read(current_file)
 
             save_as_json(data, "output/json/{0}".format(current_file[path_mask:]))
 

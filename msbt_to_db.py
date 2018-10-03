@@ -27,22 +27,20 @@ def get_source_file_id(connection, source_file):
 
     if len(response) <= 0:
         insert_file_source(connection, source_file)
-        response = query(
-            connection,
-            "SELECT `id` FROM `botwmap`.`source_files` WHERE `source_file_name` = '{0}'".format(source_file),
-            True
-        )
+        response = get_source_file_id(connection, source_file)
+    else:
+        response = response[0]['id']
 
-    return response[0]['id']
+    return response
 
 
-def insert_file_source(connection, source_file, verbose=False):
+def insert_file_source(connection, source_file):
     insert(
         connection,
         "INSERT INTO `botwmap`.`source_files` (`id`, `source_file_name`, `created_at`, `updated_at`) VALUES (NULL, '{0}',  CURRENT_TIME(), CURRENT_TIME());".format(
             source_file
         ),
-        verbose
+        True
     )
 
 
@@ -67,7 +65,7 @@ def compile_msbt(data, source_file=''):
 
 def insert_msbt(connection, data, verbose=False):
     for row in data:
-        source_file_id = get_source_file_id(connection, row['source'])
+        source_file_id = get_source_file_id(connection, row['source'][:-5])
 
         insert(
             connection,
@@ -83,6 +81,7 @@ def insert_msbt(connection, data, verbose=False):
 
 
 def insert(connection, query: str, verbose_output=False):
+    # print(query)
     result = False
 
     try:
@@ -105,6 +104,7 @@ def insert(connection, query: str, verbose_output=False):
 
 
 def query(connection, query: str, verbose_output=False):
+    # print(query)
     result = []
 
     try:

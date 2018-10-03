@@ -1,12 +1,8 @@
 import argparse
-import inspect
 import json
 import struct
 import os
 
-import math
-
-import binascii
 
 import dicttoxml
 import yaml
@@ -39,57 +35,54 @@ class NodeType:
 
 
 class BYML:
-    node_names_table = []
-    strings_table = []
-    data_object = []
-    hash_table = {}
-
-    def __init__(self, path, temp_data=None):
-        print("Parsing Binary YAML file...")
-
-        filename = os.path.basename(path)
-        print("Reading " + filename + "...")
-
-        try:
-            file = open(path, 'rb')
-            self.data = file.read()
-        except PermissionError:
-            self.data = temp_data
-
-        signature = self.data[0x00:0x02]
-        version, node_names_table_offset, strings_table_offset, root_node \
-            = struct.unpack('>HIII', self.data[0x02:0x10])
-
-        # Check file signature
-        if signature != b'BY':
-            print('\033[31mQuitting: {0} is not a binary YAML file\033[0m'.format(filename))
-            print('\033[31mExpected b\'BY\' but saw {0}\033[0m'.format(signature))
-            exit(0)
-
-        # BotW uses version 2 of BYML
-        if version != 2:
-            print('\033[31mQuitting: {0} is not the correct binary YAML version\033[0m'.format(filename))
-            print('\033[31mExpected 2 but saw {0}\033[0m'.format(version))
-            exit(0)
-
-        self.node_names_table = self.get_node(node_names_table_offset)
-
-        # Make sure there is a node names table
-        if len(self.node_names_table) <= 0:
-            print('\033[31mQuitting: {0} does not contain a node name table\033[0m'.format(filename))
-            exit(0)
-
-        self.strings_table = self.get_node(strings_table_offset)
-
-        # Make sure there is a strings table
-        if len(self.node_names_table) <= 0:
-            print('\033[31mQuitting: {0} does not contain a string table\033[0m'.format(filename))
-            exit(0)
+    def __init__(self):
+        self.clear()
+        self.hash_table = {}
 
         # Get hashed names
         self.get_hash_table()
 
-        self.data_object.append(self.get_node(root_node))
+    def read(self, path, temp_data=None):
+        print("Parsing Binary YAML file...")
+
+        filename = os.path.basename(path)
+
+        with open(path, 'rb') as infile:
+            self.clear()
+            print("Reading {0}...".format(path))
+            self.data = infile.read()
+
+            signature = self.data[0x00:0x02]
+            version, node_names_table_offset, strings_table_offset, root_node \
+                = struct.unpack('>HIII', self.data[0x02:0x10])
+
+            # Check file signature
+            if signature != b'BY':
+                print('\033[31mQuitting: {0} is not a binary YAML file\033[0m'.format(filename))
+                print('\033[31mExpected b\'BY\' but saw {0}\033[0m'.format(signature))
+                exit(0)
+
+            # BotW uses version 2 of BYML
+            if version != 2:
+                print('\033[31mQuitting: {0} is not the correct binary YAML version\033[0m'.format(filename))
+                print('\033[31mExpected 2 but saw {0}\033[0m'.format(version))
+                exit(0)
+
+            self.node_names_table = self.get_node(node_names_table_offset)
+
+            # Make sure there is a node names table
+            if len(self.node_names_table) <= 0:
+                print('\033[31mQuitting: {0} does not contain a node name table\033[0m'.format(filename))
+                exit(0)
+
+            self.strings_table = self.get_node(strings_table_offset)
+
+            # Make sure there is a strings table
+            if len(self.node_names_table) <= 0:
+                print('\033[31mQuitting: {0} does not contain a string table\033[0m'.format(filename))
+                exit(0)
+
+            return self.get_node(root_node)
 
     def get_node(self, pos, node_type=None):
         if node_type is None:
@@ -153,10 +146,10 @@ class BYML:
             # if key == 'HashId' or key == 'SRTHash':
             if isinstance(value, int):
                 value = str(value)
-                if value in self.hash_table:
-                    print('that value is a hash!')
-                    print("matched {0} to {1}".format(value, self.hash_table[value]))
-                    value = self.hash_table[value]
+                # if value in self.hash_table:
+                #     print('that value is a hash!')
+                #     print("matched {0} to {1}".format(value, self.hash_table[value]))
+                #     value = self.hash_table[value]
 
             dictionary[key] = value
             next_node += 0x08
@@ -216,6 +209,11 @@ class BYML:
         #
         # file.close()
 
+    def clear(self):
+        self.node_names_table = []
+        self.strings_table = []
+        self.data_object = []
+
 
 def main():
     parser = argparse.ArgumentParser(description="The Legend of Zelda: Breath of the Wild Binary yaml file parser")
@@ -235,7 +233,8 @@ def main():
 
     args = parser.parse_args()
 
-    byml = BYML(args.filename)
+    byml = BYML()
+    data = byml.read(args.filename)
 
     if args.all:
         args.yaml = True
@@ -243,23 +242,23 @@ def main():
         args.xml = True
 
     if args.yaml:
-        save_as_yaml(args, byml)
+        save_as_yaml(args, data)
 
     if args.json:
-        save_as_json(args, byml)
+        save_as_json(args, data)
 
     if args.xml:
-        save_as_xml(args, byml)
+        save_as_xml(args, data)
 
     if not args.yaml and not args.json and not args.xml:
-        save_as_yaml(args, byml)
+        save_as_yaml(args, data)
 
 
 def save_as_yaml(args, byml):
     filename = os.path.basename(args.filename)
     print('Saving {0}.yaml...'.format(filename))
     file = open(args.filename + '.yaml', 'w')
-    file.write(yaml.dump(byml.data_object))
+    file.write(yaml.dump(byml))
     file.close()
 
 
@@ -267,7 +266,7 @@ def save_as_json(args, byml):
     filename = os.path.basename(args.filename)
     print('Saving {0}.json...'.format(filename))
     file = open(args.filename + '.json', 'w')
-    file.write(json.dumps(byml.data_object))
+    file.write(json.dumps(byml))
     file.close()
 
 
@@ -277,7 +276,7 @@ def save_as_xml(args, byml):
     filename = os.path.basename(args.filename)
     print('Saving {0}.xml...'.format(filename))
     file = open(args.filename + '.xml', 'w')
-    dom = dicttoxml.dicttoxml(byml.data_object).decode('utf-8')
+    dom = dicttoxml.dicttoxml(byml).decode('utf-8')
     file.write(parseString(dom).toprettyxml())
     file.close()
 
